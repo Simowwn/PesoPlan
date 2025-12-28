@@ -23,6 +23,8 @@ const SUBCATEGORIES_BY_CATEGORY: Record<'needs' | 'wants', { value: ExpenseSubca
     { value: 'other', label: 'Other' },
   ],
   wants: [
+    { value: 'food', label: 'Food' },
+    { value: 'transportation', label: 'Transportation' },
     { value: 'clothes', label: 'Clothes' },
     { value: 'toys', label: 'Toys' },
     { value: 'gadgets', label: 'Gadgets' },
