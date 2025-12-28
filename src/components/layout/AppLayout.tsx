@@ -1,7 +1,8 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { 
   LayoutDashboard, 
   TrendingUp, 
@@ -12,7 +13,6 @@ import {
   Menu,
   X
 } from 'lucide-react';
-import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
 interface AppLayoutProps {
@@ -77,6 +77,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             <span className="hidden sm:block text-sm text-muted-foreground">
               {user?.email}
             </span>
+            <ThemeToggle />
             <Button 
               variant="ghost" 
               size="icon" 
