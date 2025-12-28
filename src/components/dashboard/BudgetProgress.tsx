@@ -38,7 +38,7 @@ export function BudgetProgress({ categories }: BudgetProgressProps) {
                 <div className="text-right">
                   <p className={cn(
                     "text-sm font-semibold",
-                    isOverBudget ? "text-destructive" : "text-success"
+                    isOverBudget && "text-foreground"
                   )}>
                     ₱{category.spent.toLocaleString()}
                   </p>
@@ -52,21 +52,13 @@ export function BudgetProgress({ categories }: BudgetProgressProps) {
                   value={usedPercentage} 
                   className={cn(
                     "h-2",
-                    isOverBudget 
-                      ? "[&>div]:bg-destructive" 
-                      : "[&>div]:bg-success"
+                    isOverBudget && "[&>div]:bg-foreground"
                   )}
                 />
               </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className={cn(
-                  isOverBudget ? "text-destructive" : "text-muted-foreground"
-                )}>
-                  {usedPercentage.toFixed(0)}% used
-                </span>
-                <span className={cn(
-                  isOverBudget ? "text-destructive" : "text-success"
-                )}>
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{usedPercentage.toFixed(0)}% used</span>
+                <span>
                   {isOverBudget 
                     ? `₱${(category.spent - category.budget).toLocaleString()} over`
                     : `₱${(category.budget - category.spent).toLocaleString()} left`
