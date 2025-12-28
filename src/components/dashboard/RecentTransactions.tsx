@@ -1,6 +1,19 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Income, Expense } from '@/types';
-import { TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
+import { Income, Expense, ExpenseSubcategory } from '@/types';
+import { 
+  TrendingUp, 
+  RefreshCw,
+  Utensils,
+  Car,
+  Shirt,
+  Gamepad2,
+  Smartphone,
+  Plane,
+  Zap,
+  Home,
+  Film,
+  MoreHorizontal
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
@@ -10,6 +23,32 @@ interface RecentTransactionsProps {
 }
 
 type Transaction = (Income | Expense) & { type: 'income' | 'expense' };
+
+const SUBCATEGORY_ICONS: Record<ExpenseSubcategory, React.ElementType> = {
+  food: Utensils,
+  transportation: Car,
+  clothes: Shirt,
+  toys: Gamepad2,
+  gadgets: Smartphone,
+  travel: Plane,
+  utilities: Zap,
+  rent: Home,
+  entertainment: Film,
+  other: MoreHorizontal,
+};
+
+const SUBCATEGORY_LABELS: Record<ExpenseSubcategory, string> = {
+  food: 'Food',
+  transportation: 'Transportation',
+  clothes: 'Clothes',
+  toys: 'Toys',
+  gadgets: 'Gadgets',
+  travel: 'Travel',
+  utilities: 'Utilities',
+  rent: 'Rent',
+  entertainment: 'Entertainment',
+  other: 'Other',
+};
 
 export function RecentTransactions({ incomes, expenses }: RecentTransactionsProps) {
   const transactions: Transaction[] = [
@@ -44,6 +83,10 @@ export function RecentTransactions({ incomes, expenses }: RecentTransactionsProp
               const incomeTransaction = transaction as Income;
               const expenseTransaction = transaction as Expense;
               
+              const ExpenseIcon = !isIncome && expenseTransaction.subcategory 
+                ? SUBCATEGORY_ICONS[expenseTransaction.subcategory] 
+                : MoreHorizontal;
+              
               return (
                 <div 
                   key={transaction.id} 
@@ -57,7 +100,7 @@ export function RecentTransactions({ incomes, expenses }: RecentTransactionsProp
                       {isIncome ? (
                         <TrendingUp className="h-4 w-4 text-foreground" />
                       ) : (
-                        <TrendingDown className="h-4 w-4 text-muted-foreground" />
+                        <ExpenseIcon className="h-4 w-4 text-muted-foreground" />
                       )}
                     </div>
                     <div>
@@ -65,7 +108,7 @@ export function RecentTransactions({ incomes, expenses }: RecentTransactionsProp
                       <p className="text-xs text-muted-foreground">
                         {isIncome 
                           ? incomeTransaction.source 
-                          : `${expenseTransaction.category} ${expenseTransaction.is_recurring ? '• Recurring' : ''}`
+                          : `${expenseTransaction.subcategory ? SUBCATEGORY_LABELS[expenseTransaction.subcategory] : expenseTransaction.category} ${expenseTransaction.is_recurring ? '• Recurring' : ''}`
                         }
                       </p>
                     </div>

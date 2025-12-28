@@ -15,12 +15,25 @@ export interface Income {
   updated_at: string;
 }
 
+export type ExpenseSubcategory = 
+  | 'food'
+  | 'transportation'
+  | 'clothes'
+  | 'toys'
+  | 'gadgets'
+  | 'travel'
+  | 'utilities'
+  | 'rent'
+  | 'entertainment'
+  | 'other';
+
 export interface Expense {
   id: string;
   user_id: string;
   name: string;
   amount: number;
   category: 'needs' | 'wants';
+  subcategory: ExpenseSubcategory;
   is_recurring: boolean;
   recurring_interval?: 'weekly' | 'monthly' | 'yearly';
   next_due_date?: string;
