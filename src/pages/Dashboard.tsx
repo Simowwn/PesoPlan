@@ -123,19 +123,19 @@ export default function Dashboard() {
             title="Needs Budget"
             value={summary.needsBudget}
             subtitle={`₱${summary.needsRemaining.toLocaleString()} remaining`}
-            icon={<TrendingDown className="h-5 w-5 text-muted-foreground" />}
+            icon={<TrendingDown className="h-5 w-5 text-danger" />}
           />
           <StatCard
             title="Wants Budget"
             value={summary.wantsBudget}
             subtitle={`₱${summary.wantsRemaining.toLocaleString()} remaining`}
-            icon={<TrendingUp className="h-5 w-5 text-muted-foreground" />}
+            icon={<TrendingUp className="h-5 w-5 text-danger" />}
           />
           <StatCard
             title="Savings Target"
             value={summary.savingsBudget}
             subtitle={`${activePlan?.savings_percentage || 20}% of income`}
-            icon={<PiggyBank className="h-5 w-5 text-muted-foreground" />}
+            icon={<PiggyBank className="h-5 w-5 text-success" />}
           />
         </div>
 
