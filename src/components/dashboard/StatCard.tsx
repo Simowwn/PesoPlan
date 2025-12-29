@@ -42,15 +42,15 @@ export function StatCard({
               {title}
             </p>
             <p className={cn(
-              "text-lg font-medium tracking-tight",
-              isInverted ? "text-background/70" : "text-muted-foreground"
+              "text-3xl font-bold tracking-tight",
+              isInverted ? "text-background" : "text-foreground"
             )}>
               {typeof value === 'number' ? `₱${value.toLocaleString()}` : value}
             </p>
             {subtitle && (
               <p className={cn(
-                "text-2xl font-bold",
-                isInverted ? "text-background" : "text-foreground"
+                "text-sm",
+                isInverted ? "text-background/60" : "text-muted-foreground"
               )}>
                 {subtitle}
               </p>
