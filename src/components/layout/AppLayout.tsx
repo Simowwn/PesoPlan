@@ -47,7 +47,7 @@ export function AppLayout({ children }: AppLayoutProps) {
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-foreground">
                 <Wallet className="h-5 w-5 text-background" />
               </div>
-              <span className="text-xl font-semibold tracking-tight">SaveWise</span>
+              <span className="text-xl font-semibold tracking-tight">PesoPlan</span>
             </Link>
           </div>
 
