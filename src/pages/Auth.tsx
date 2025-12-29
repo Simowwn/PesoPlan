@@ -79,7 +79,7 @@ export default function Auth() {
               <Wallet className="h-7 w-7 text-background" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">SaveWise</h1>
+          <h1 className="text-3xl font-bold tracking-tight">PesoPlan</h1>
           <p className="text-muted-foreground">
             Smart budgeting for a better financial future
           </p>
