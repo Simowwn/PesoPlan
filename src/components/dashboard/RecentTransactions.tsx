@@ -116,7 +116,7 @@ export function RecentTransactions({ incomes, expenses }: RecentTransactionsProp
                   <div className="text-right">
                     <p className={cn(
                       "text-sm font-semibold",
-                      isIncome ? "text-foreground" : "text-muted-foreground"
+                      isIncome ? "text-green-500" : "text-red-500"
                     )}>
                       {isIncome ? '+' : '-'}₱{transaction.amount.toLocaleString()}
                     </p>
