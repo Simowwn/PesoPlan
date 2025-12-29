@@ -121,14 +121,12 @@ export default function Dashboard() {
           />
           <StatCard
             title="Needs Budget"
-            value={summary.needsBudget}
-            subtitle={`₱${summary.needsRemaining.toLocaleString()} remaining`}
+            value={`₱${summary.needsRemaining.toLocaleString()} remaining`}
             icon={<TrendingDown className="h-5 w-5 text-red-500" />}
           />
           <StatCard
             title="Wants Budget"
-            value={summary.wantsBudget}
-            subtitle={`₱${summary.wantsRemaining.toLocaleString()} remaining`}
+            value={`₱${summary.wantsRemaining.toLocaleString()} remaining`}
             icon={<TrendingUp className="h-5 w-5 text-red-400" />}
           />
           <StatCard
