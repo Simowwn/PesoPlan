@@ -1,169 +1,221 @@
 import { Router, Request, Response } from 'express';
 import { BudgetPlan } from '../types';
+import { sql } from '../lib/db';
 
 const router = Router();
 
-// In-memory storage (replace with database in production)
-let budgetPlans: BudgetPlan[] = [
-  {
-    id: '1',
-    user_id: '1',
-    needs_percentage: 50,
-    wants_percentage: 30,
-    savings_percentage: 20,
-    active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-];
-
 // GET /api/budget-plans - Get all budget plans
-router.get('/', (req: Request, res: Response) => {
-  const { user_id, active } = req.query;
-  
-  let filteredPlans = budgetPlans;
-  if (user_id) {
-    filteredPlans = filteredPlans.filter((p) => p.user_id === user_id);
-  }
-  if (active !== undefined) {
-    filteredPlans = filteredPlans.filter((p) => p.active === (active === 'true'));
-  }
+router.get('/', async (req: Request, res: Response) => {
+  try {
+    const { user_id, active } = req.query;
+    
+    let result;
+    if (user_id && active !== undefined) {
+      result = await sql`
+        SELECT * FROM budget_plans 
+        WHERE user_id = ${user_id} AND active = ${active === 'true'}
+        ORDER BY created_at DESC
+      `;
+    } else if (user_id) {
+      result = await sql`
+        SELECT * FROM budget_plans 
+        WHERE user_id = ${user_id}
+        ORDER BY created_at DESC
+      `;
+    } else if (active !== undefined) {
+      result = await sql`
+        SELECT * FROM budget_plans 
+        WHERE active = ${active === 'true'}
+        ORDER BY created_at DESC
+      `;
+    } else {
+      result = await sql`
+        SELECT * FROM budget_plans 
+        ORDER BY created_at DESC
+      `;
+    }
 
-  res.json(filteredPlans);
+    res.json(result || []);
+  } catch (error: any) {
+    console.error('Error fetching budget plans:', error);
+    res.status(500).json({ error: 'Failed to fetch budget plans', details: error.message });
+  }
 });
 
 // GET /api/budget-plans/:id - Get budget plan by ID
-router.get('/:id', (req: Request, res: Response) => {
-  const plan = budgetPlans.find((p) => p.id === req.params.id);
-  if (!plan) {
-    return res.status(404).json({ error: 'Budget plan not found' });
+router.get('/:id', async (req: Request, res: Response) => {
+  try {
+    const result = await sql`
+      SELECT * FROM budget_plans 
+      WHERE id = ${req.params.id}
+    `;
+
+    if (!result || result.length === 0) {
+      return res.status(404).json({ error: 'Budget plan not found' });
+    }
+
+    res.json(result[0]);
+  } catch (error: any) {
+    console.error('Error fetching budget plan:', error);
+    res.status(500).json({ error: 'Failed to fetch budget plan', details: error.message });
   }
-  res.json(plan);
 });
 
 // POST /api/budget-plans - Create a new budget plan
-router.post('/', (req: Request, res: Response) => {
-  const {
-    user_id,
-    needs_percentage,
-    wants_percentage,
-    savings_percentage,
-    active,
-  } = req.body;
+router.post('/', async (req: Request, res: Response) => {
+  try {
+    const {
+      user_id,
+      needs_percentage,
+      wants_percentage,
+      savings_percentage,
+      active,
+    } = req.body;
 
-  if (
-    !user_id ||
-    needs_percentage === undefined ||
-    wants_percentage === undefined ||
-    savings_percentage === undefined
-  ) {
-    return res.status(400).json({
-      error: 'Missing required fields: user_id, needs_percentage, wants_percentage, savings_percentage',
-    });
-  }
+    if (
+      !user_id ||
+      needs_percentage === undefined ||
+      wants_percentage === undefined ||
+      savings_percentage === undefined
+    ) {
+      return res.status(400).json({
+        error: 'Missing required fields: user_id, needs_percentage, wants_percentage, savings_percentage',
+      });
+    }
 
-  const total = Number(needs_percentage) + Number(wants_percentage) + Number(savings_percentage);
-  if (Math.abs(total - 100) > 0.01) {
-    return res.status(400).json({
-      error: 'Percentages must sum to 100',
-    });
-  }
-
-  // Deactivate other plans for the same user
-  if (active !== false) {
-    budgetPlans.forEach((plan) => {
-      if (plan.user_id === user_id) {
-        plan.active = false;
-      }
-    });
-  }
-
-  const now = new Date().toISOString();
-  const newPlan: BudgetPlan = {
-    id: Date.now().toString(),
-    user_id,
-    needs_percentage: Number(needs_percentage),
-    wants_percentage: Number(wants_percentage),
-    savings_percentage: Number(savings_percentage),
-    active: active !== false,
-    created_at: now,
-    updated_at: now,
-  };
-
-  budgetPlans.push(newPlan);
-  res.status(201).json(newPlan);
-});
-
-// PUT /api/budget-plans/:id - Update budget plan
-router.put('/:id', (req: Request, res: Response) => {
-  const planIndex = budgetPlans.findIndex((p) => p.id === req.params.id);
-  if (planIndex === -1) {
-    return res.status(404).json({ error: 'Budget plan not found' });
-  }
-
-  const {
-    needs_percentage,
-    wants_percentage,
-    savings_percentage,
-    active,
-  } = req.body;
-
-  // If percentages are being updated, validate they sum to 100
-  if (
-    needs_percentage !== undefined ||
-    wants_percentage !== undefined ||
-    savings_percentage !== undefined
-  ) {
-    const needs = needs_percentage !== undefined 
-      ? Number(needs_percentage) 
-      : budgetPlans[planIndex].needs_percentage;
-    const wants = wants_percentage !== undefined 
-      ? Number(wants_percentage) 
-      : budgetPlans[planIndex].wants_percentage;
-    const savings = savings_percentage !== undefined 
-      ? Number(savings_percentage) 
-      : budgetPlans[planIndex].savings_percentage;
-
-    const total = needs + wants + savings;
+    const total = Number(needs_percentage) + Number(wants_percentage) + Number(savings_percentage);
     if (Math.abs(total - 100) > 0.01) {
       return res.status(400).json({
         error: 'Percentages must sum to 100',
       });
     }
-  }
 
-  // If activating this plan, deactivate others for the same user
-  if (active === true) {
-    budgetPlans.forEach((plan) => {
-      if (plan.user_id === budgetPlans[planIndex].user_id && plan.id !== req.params.id) {
-        plan.active = false;
+    // Deactivate other plans for the same user if this one is active
+    if (active !== false) {
+      await sql`
+        UPDATE budget_plans 
+        SET active = false 
+        WHERE user_id = ${user_id} AND active = true
+      `;
+    }
+
+    const now = new Date().toISOString();
+    const result = await sql`
+      INSERT INTO budget_plans (
+        user_id, needs_percentage, wants_percentage, savings_percentage, 
+        active, created_at, updated_at
+      )
+      VALUES (
+        ${user_id},
+        ${Number(needs_percentage)},
+        ${Number(wants_percentage)},
+        ${Number(savings_percentage)},
+        ${active !== false},
+        ${now},
+        ${now}
+      )
+      RETURNING *
+    `;
+
+    res.status(201).json(result[0]);
+  } catch (error: any) {
+    console.error('Error creating budget plan:', error);
+    res.status(500).json({ error: 'Failed to create budget plan', details: error.message });
+  }
+});
+
+// PUT /api/budget-plans/:id - Update budget plan
+router.put('/:id', async (req: Request, res: Response) => {
+  try {
+    const {
+      needs_percentage,
+      wants_percentage,
+      savings_percentage,
+      active,
+    } = req.body;
+
+    // Get existing plan first
+    const existing = await sql`
+      SELECT * FROM budget_plans WHERE id = ${req.params.id}
+    `;
+
+    if (!existing || existing.length === 0) {
+      return res.status(404).json({ error: 'Budget plan not found' });
+    }
+
+    // If percentages are being updated, validate they sum to 100
+    if (
+      needs_percentage !== undefined ||
+      wants_percentage !== undefined ||
+      savings_percentage !== undefined
+    ) {
+      const needs = needs_percentage !== undefined 
+        ? Number(needs_percentage) 
+        : existing[0].needs_percentage;
+      const wants = wants_percentage !== undefined 
+        ? Number(wants_percentage) 
+        : existing[0].wants_percentage;
+      const savings = savings_percentage !== undefined 
+        ? Number(savings_percentage) 
+        : existing[0].savings_percentage;
+
+      const total = needs + wants + savings;
+      if (Math.abs(total - 100) > 0.01) {
+        return res.status(400).json({
+          error: 'Percentages must sum to 100',
+        });
       }
-    });
+    }
+
+    // If activating this plan, deactivate others for the same user
+    if (active === true) {
+      await sql`
+        UPDATE budget_plans 
+        SET active = false 
+        WHERE user_id = ${existing[0].user_id} AND id != ${req.params.id} AND active = true
+      `;
+    }
+
+    const updatedAt = new Date().toISOString();
+    const result = await sql`
+      UPDATE budget_plans 
+      SET 
+        needs_percentage = ${needs_percentage !== undefined ? Number(needs_percentage) : existing[0].needs_percentage},
+        wants_percentage = ${wants_percentage !== undefined ? Number(wants_percentage) : existing[0].wants_percentage},
+        savings_percentage = ${savings_percentage !== undefined ? Number(savings_percentage) : existing[0].savings_percentage},
+        active = ${active !== undefined ? Boolean(active) : existing[0].active},
+        updated_at = ${updatedAt}
+      WHERE id = ${req.params.id}
+      RETURNING *
+    `;
+
+    res.json(result[0]);
+  } catch (error: any) {
+    console.error('Error updating budget plan:', error);
+    res.status(500).json({ error: 'Failed to update budget plan', details: error.message });
   }
-
-  const updatedPlan: BudgetPlan = {
-    ...budgetPlans[planIndex],
-    ...(needs_percentage !== undefined && { needs_percentage: Number(needs_percentage) }),
-    ...(wants_percentage !== undefined && { wants_percentage: Number(wants_percentage) }),
-    ...(savings_percentage !== undefined && { savings_percentage: Number(savings_percentage) }),
-    ...(active !== undefined && { active: Boolean(active) }),
-    updated_at: new Date().toISOString(),
-  };
-
-  budgetPlans[planIndex] = updatedPlan;
-  res.json(updatedPlan);
 });
 
 // DELETE /api/budget-plans/:id - Delete budget plan
-router.delete('/:id', (req: Request, res: Response) => {
-  const planIndex = budgetPlans.findIndex((p) => p.id === req.params.id);
-  if (planIndex === -1) {
-    return res.status(404).json({ error: 'Budget plan not found' });
-  }
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const result = await sql`
+      DELETE FROM budget_plans 
+      WHERE id = ${req.params.id}
+      RETURNING id
+    `;
 
-  budgetPlans.splice(planIndex, 1);
-  res.status(204).send();
+    if (!result || result.length === 0) {
+      return res.status(404).json({ error: 'Budget plan not found' });
+    }
+
+    res.status(204).send();
+  } catch (error: any) {
+    console.error('Error deleting budget plan:', error);
+    res.status(500).json({ error: 'Failed to delete budget plan', details: error.message });
+  }
 });
 
 export { router as budgetPlanRoutes };
+
 

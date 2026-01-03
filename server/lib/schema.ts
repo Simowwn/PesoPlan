@@ -45,3 +45,4 @@ export const userTable = pgTable('users', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
+

@@ -1,0 +1,70 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id         String   @id @default(uuid())
+  email      String   @unique
+  created_at DateTime @default(now())
+
+  income      Income[]
+  expenses    Expense[]
+  budgetPlans BudgetPlan[]
+
+  @@map("users")
+}
+
+model Income {
+  id            String   @id @default(uuid())
+  user_id       String
+  name          String
+  amount        Decimal  @db.Decimal(10, 2)
+  source        String
+  date_received DateTime @default(now())
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("income")
+}
+
+model Expense {
+  id                String    @id @default(uuid())
+  user_id           String
+  name              String
+  amount            Decimal   @db.Decimal(10, 2)
+  category          String    // 'needs' | 'wants'
+  subcategory       String
+  is_recurring      Boolean   @default(false)
+  recurring_interval String?   // 'weekly' | 'monthly' | 'yearly'
+  next_due_date     DateTime?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("expenses")
+}
+
+model BudgetPlan {
+  id                String   @id @default(uuid())
+  user_id           String
+  needs_percentage  Decimal  @db.Decimal(5, 2)
+  wants_percentage  Decimal  @db.Decimal(5, 2)
+  savings_percentage Decimal @db.Decimal(5, 2)
+  active            Boolean  @default(false)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("budget_plans")
+}

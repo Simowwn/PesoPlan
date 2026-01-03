@@ -1,74 +1,123 @@
 import { Router, Request, Response } from 'express';
 import { User } from '../types';
+import { sql } from '../lib/db';
 
 const router = Router();
 
-// In-memory storage (replace with database in production)
-let users: User[] = [
-  {
-    id: '1',
-    email: 'user@example.com',
-    created_at: new Date().toISOString(),
-  },
-];
-
 // GET /api/users - Get all users
-router.get('/', (req: Request, res: Response) => {
-  res.json(users);
+router.get('/', async (req: Request, res: Response) => {
+  try {
+    const result = await sql`
+      SELECT * FROM users 
+      ORDER BY created_at DESC
+    `;
+    res.json(result || []);
+  } catch (error: any) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users', details: error.message });
+  }
 });
 
 // GET /api/users/:id - Get user by ID
-router.get('/:id', (req: Request, res: Response) => {
-  const user = users.find((u) => u.id === req.params.id);
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
+router.get('/:id', async (req: Request, res: Response) => {
+  try {
+    const result = await sql`
+      SELECT * FROM users 
+      WHERE id = ${req.params.id}
+    `;
+
+    if (!result || result.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json(result[0]);
+  } catch (error: any) {
+    console.error('Error fetching user:', error);
+    res.status(500).json({ error: 'Failed to fetch user', details: error.message });
   }
-  res.json(user);
 });
 
 // POST /api/users - Create a new user
-router.post('/', (req: Request, res: Response) => {
-  const { email } = req.body;
+router.post('/', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
 
-  if (!email) {
-    return res.status(400).json({ error: 'Email is required' });
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const result = await sql`
+      INSERT INTO users (email, created_at)
+      VALUES (${email}, ${new Date().toISOString()})
+      RETURNING *
+    `;
+
+    res.status(201).json(result[0]);
+  } catch (error: any) {
+    console.error('Error creating user:', error);
+    // Handle unique constraint violation
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'Email already exists' });
+    }
+    res.status(500).json({ error: 'Failed to create user', details: error.message });
   }
-
-  const newUser: User = {
-    id: Date.now().toString(),
-    email,
-    created_at: new Date().toISOString(),
-  };
-
-  users.push(newUser);
-  res.status(201).json(newUser);
 });
 
 // PUT /api/users/:id - Update user
-router.put('/:id', (req: Request, res: Response) => {
-  const userIndex = users.findIndex((u) => u.id === req.params.id);
-  if (userIndex === -1) {
-    return res.status(404).json({ error: 'User not found' });
-  }
+router.put('/:id', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
 
-  const { email } = req.body;
-  if (email) {
-    users[userIndex] = { ...users[userIndex], email };
-  }
+    // Get existing user first
+    const existing = await sql`
+      SELECT * FROM users WHERE id = ${req.params.id}
+    `;
 
-  res.json(users[userIndex]);
+    if (!existing || existing.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const result = await sql`
+      UPDATE users 
+      SET email = ${email}
+      WHERE id = ${req.params.id}
+      RETURNING *
+    `;
+
+    res.json(result[0]);
+  } catch (error: any) {
+    console.error('Error updating user:', error);
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'Email already exists' });
+    }
+    res.status(500).json({ error: 'Failed to update user', details: error.message });
+  }
 });
 
 // DELETE /api/users/:id - Delete user
-router.delete('/:id', (req: Request, res: Response) => {
-  const userIndex = users.findIndex((u) => u.id === req.params.id);
-  if (userIndex === -1) {
-    return res.status(404).json({ error: 'User not found' });
-  }
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const result = await sql`
+      DELETE FROM users 
+      WHERE id = ${req.params.id}
+      RETURNING id
+    `;
 
-  users.splice(userIndex, 1);
-  res.status(204).send();
+    if (!result || result.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.status(204).send();
+  } catch (error: any) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ error: 'Failed to delete user', details: error.message });
+  }
 });
 
 export { router as userRoutes };
+
 
