@@ -1,9 +1,14 @@
+// Load environment variables first
+import 'dotenv/config';
+// Load environment variables from .env file
+import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { incomeRoutes } from './routes/income';
 import { expenseRoutes } from './routes/expense';
 import { budgetPlanRoutes } from './routes/budgetPlan';
 import { userRoutes } from './routes/user';
+import { authRoutes } from './routes/auth';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -18,6 +23,7 @@ app.get('/api/health', (req: Request, res: Response) => {
 });
 
 // API Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/income', incomeRoutes);
 app.use('/api/expenses', expenseRoutes);

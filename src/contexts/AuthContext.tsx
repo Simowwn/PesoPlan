@@ -15,8 +15,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock user storage for demo (will be replaced with Supabase)
-const MOCK_USERS_KEY = 'budget_app_users';
+// API base URL - use environment variable or default to local
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 const CURRENT_USER_KEY = 'budget_app_current_user';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -27,48 +27,89 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Check for existing session
     const storedUser = localStorage.getItem(CURRENT_USER_KEY);
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        // Verify user still exists in database
+        verifyUser(parsedUser.id).then((isValid) => {
+          if (isValid) {
+            setUser(parsedUser);
+          } else {
+            localStorage.removeItem(CURRENT_USER_KEY);
+          }
+          setIsLoading(false);
+        });
+      } catch {
+        localStorage.removeItem(CURRENT_USER_KEY);
+        setIsLoading(false);
+      }
+    } else {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, []);
 
+  const verifyUser = async (userId: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`${API_URL}/api/users/${userId}`);
+      return response.ok;
+    } catch {
+      return false;
+    }
+  };
+
   const login = async (email: string, password: string): Promise<{ error?: string }> => {
-    const users = JSON.parse(localStorage.getItem(MOCK_USERS_KEY) || '{}');
-    const userRecord = users[email];
-    
-    if (!userRecord) {
-      return { error: 'No account found with this email' };
+    try {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        return { error: error.error || 'Failed to login' };
+      }
+
+      const data = await response.json();
+      const loggedInUser = { id: data.user.id, email: data.user.email };
+      
+      // Store user
+      setUser(loggedInUser);
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(loggedInUser));
+      
+      return {};
+    } catch (error: any) {
+      return { error: error.message || 'Failed to login' };
     }
-    
-    if (userRecord.password !== password) {
-      return { error: 'Invalid password' };
-    }
-    
-    const loggedInUser = { id: userRecord.id, email };
-    setUser(loggedInUser);
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(loggedInUser));
-    return {};
   };
 
   const signup = async (email: string, password: string): Promise<{ error?: string }> => {
-    const users = JSON.parse(localStorage.getItem(MOCK_USERS_KEY) || '{}');
-    
-    if (users[email]) {
-      return { error: 'An account with this email already exists' };
+    try {
+      const response = await fetch(`${API_URL}/api/auth/signup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        return { error: error.error || 'Failed to create account' };
+      }
+
+      const data = await response.json();
+      const loggedInUser = { id: data.user.id, email: data.user.email };
+      
+      // Store user
+      setUser(loggedInUser);
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(loggedInUser));
+      
+      return {};
+    } catch (error: any) {
+      return { error: error.message || 'Failed to create account' };
     }
-    
-    const newUser = {
-      id: crypto.randomUUID(),
-      password,
-    };
-    
-    users[email] = newUser;
-    localStorage.setItem(MOCK_USERS_KEY, JSON.stringify(users));
-    
-    const loggedInUser = { id: newUser.id, email };
-    setUser(loggedInUser);
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(loggedInUser));
-    return {};
   };
 
   const logout = () => {
