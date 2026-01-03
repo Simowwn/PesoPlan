@@ -53,7 +53,7 @@ export function PlanForm({ onClose }: PlanFormProps) {
     setIsSubmitting(true);
     
     try {
-      addPlan({
+      await addPlan({
         needs_percentage: needsNum,
         wants_percentage: wantsNum,
         savings_percentage: savingsNum,

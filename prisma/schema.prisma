@@ -10,9 +10,10 @@ generator client {
 }
 
 model User {
-  id         String   @id @default(uuid())
-  email      String   @unique
-  created_at DateTime @default(now())
+  id           String   @id @default(uuid())
+  email        String   @unique
+  password_hash String?
+  created_at   DateTime @default(now())
 
   income      Income[]
   expenses    Expense[]

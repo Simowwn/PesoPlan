@@ -1,215 +1,146 @@
-import { Router, Request, Response } from 'express';
-import { Expense } from '../types';
+import { Router } from 'express';
 import { sql } from '../lib/db';
+import { authenticate, AuthRequest } from '../middleware/auth';
+import { validate } from '../utils/validation';
+import { createExpenseSchema, updateExpenseSchema, getExpensesQuerySchema } from '../validators/expense';
+import { asyncHandler, NotFoundError, UnauthorizedError } from '../utils/errors';
+import { sendSuccess } from '../utils/response';
+import { schemas } from '../utils/validation';
 
 const router = Router();
 
-// GET /api/expenses - Get all expense records
-router.get('/', async (req: Request, res: Response) => {
-  try {
-    const { user_id, category } = req.query;
-    
-    let result;
-    if (user_id && category) {
-      result = await sql`
-        SELECT * FROM expenses 
-        WHERE user_id = ${user_id} AND category = ${category}
-        ORDER BY created_at DESC
-      `;
-    } else if (user_id) {
-      result = await sql`
-        SELECT * FROM expenses 
-        WHERE user_id = ${user_id}
-        ORDER BY created_at DESC
-      `;
-    } else if (category) {
-      result = await sql`
-        SELECT * FROM expenses 
-        WHERE category = ${category}
-        ORDER BY created_at DESC
-      `;
-    } else {
-      result = await sql`
-        SELECT * FROM expenses 
-        ORDER BY created_at DESC
-      `;
-    }
+// All expense routes require authentication
+router.use(authenticate);
 
-    res.json(result || []);
-  } catch (error: any) {
-    console.error('Error fetching expenses:', error);
-    res.status(500).json({ error: 'Failed to fetch expenses', details: error.message });
+// GET /api/expenses - Get all expense records
+router.get('/', asyncHandler(async (req: AuthRequest, res) => {
+  const query = validate(getExpensesQuerySchema, req.query);
+  const userId = req.userId!;
+
+  // Users can only see their own expenses unless they're admins (future feature)
+  const user_id = query.user_id || userId;
+  
+  // Ensure users can only access their own data
+  if (user_id !== userId) {
+    throw new UnauthorizedError('You can only access your own expenses');
   }
-});
+
+  let result;
+  if (query.category) {
+    result = await sql`
+      SELECT * FROM expenses 
+      WHERE user_id = ${user_id} AND category = ${query.category}
+      ORDER BY created_at DESC
+    `;
+  } else {
+    result = await sql`
+      SELECT * FROM expenses 
+      WHERE user_id = ${user_id}
+      ORDER BY created_at DESC
+    `;
+  }
+
+  sendSuccess(res, result || []);
+}));
 
 // GET /api/expenses/:id - Get expense by ID
-router.get('/:id', async (req: Request, res: Response) => {
-  try {
-    const result = await sql`
-      SELECT * FROM expenses 
-      WHERE id = ${req.params.id}
-    `;
+router.get('/:id', asyncHandler(async (req: AuthRequest, res) => {
+  const id = validate(schemas.uuid, req.params.id);
+  const userId = req.userId!;
 
-    if (!result || result.length === 0) {
-      return res.status(404).json({ error: 'Expense not found' });
-    }
+  const result = await sql`
+    SELECT * FROM expenses 
+    WHERE id = ${id} AND user_id = ${userId}
+  `;
 
-    res.json(result[0]);
-  } catch (error: any) {
-    console.error('Error fetching expense:', error);
-    res.status(500).json({ error: 'Failed to fetch expense', details: error.message });
+  if (!result || result.length === 0) {
+    throw new NotFoundError('Expense');
   }
-});
+
+  sendSuccess(res, result[0]);
+}));
 
 // POST /api/expenses - Create a new expense record
-router.post('/', async (req: Request, res: Response) => {
-  try {
-    const {
-      user_id,
-      name,
-      amount,
-      category,
-      subcategory,
-      is_recurring,
-      recurring_interval,
-      next_due_date,
-    } = req.body;
+router.post('/', asyncHandler(async (req: AuthRequest, res) => {
+  const userId = req.userId!;
+  const data = validate(createExpenseSchema, { ...req.body, user_id: userId });
 
-    if (!user_id || !name || amount === undefined || !category || !subcategory) {
-      return res.status(400).json({
-        error: 'Missing required fields: user_id, name, amount, category, subcategory',
-      });
-    }
+  const now = new Date().toISOString();
+  const result = await sql`
+    INSERT INTO expenses (
+      user_id, name, amount, category, subcategory, 
+      is_recurring, recurring_interval, next_due_date, 
+      created_at, updated_at
+    )
+    VALUES (
+      ${data.user_id}, 
+      ${data.name}, 
+      ${Number(data.amount)}, 
+      ${data.category}, 
+      ${data.subcategory},
+      ${Boolean(data.is_recurring)},
+      ${data.is_recurring && data.recurring_interval ? data.recurring_interval : null},
+      ${data.is_recurring && data.next_due_date ? data.next_due_date : null},
+      ${now},
+      ${now}
+    )
+    RETURNING *
+  `;
 
-    if (category !== 'needs' && category !== 'wants') {
-      return res.status(400).json({ error: 'Category must be "needs" or "wants"' });
-    }
-
-    const validSubcategories = [
-      'food',
-      'transportation',
-      'clothes',
-      'toys',
-      'gadgets',
-      'travel',
-      'utilities',
-      'rent',
-      'entertainment',
-      'other',
-    ];
-    if (!validSubcategories.includes(subcategory)) {
-      return res.status(400).json({ error: 'Invalid subcategory' });
-    }
-
-    const now = new Date().toISOString();
-    const result = await sql`
-      INSERT INTO expenses (
-        user_id, name, amount, category, subcategory, 
-        is_recurring, recurring_interval, next_due_date, 
-        created_at, updated_at
-      )
-      VALUES (
-        ${user_id}, 
-        ${name}, 
-        ${Number(amount)}, 
-        ${category}, 
-        ${subcategory},
-        ${Boolean(is_recurring)},
-        ${is_recurring && recurring_interval ? recurring_interval : null},
-        ${is_recurring && next_due_date ? next_due_date : null},
-        ${now},
-        ${now}
-      )
-      RETURNING *
-    `;
-
-    res.status(201).json(result[0]);
-  } catch (error: any) {
-    console.error('Error creating expense:', error);
-    res.status(500).json({ error: 'Failed to create expense', details: error.message });
-  }
-});
+  sendSuccess(res, result[0], 201);
+}));
 
 // PUT /api/expenses/:id - Update expense record
-router.put('/:id', async (req: Request, res: Response) => {
-  try {
-    const {
-      name,
-      amount,
-      category,
-      subcategory,
-      is_recurring,
-      recurring_interval,
-      next_due_date,
-    } = req.body;
-    const updatedAt = new Date().toISOString();
+router.put('/:id', asyncHandler(async (req: AuthRequest, res) => {
+  const id = validate(schemas.uuid, req.params.id);
+  const userId = req.userId!;
+  const data = validate(updateExpenseSchema, req.body);
+  const updatedAt = new Date().toISOString();
 
-    // Get existing expense first
-    const existing = await sql`
-      SELECT * FROM expenses WHERE id = ${req.params.id}
-    `;
+  // Get existing expense first and verify ownership
+  const existing = await sql`
+    SELECT * FROM expenses WHERE id = ${id} AND user_id = ${userId}
+  `;
 
-    if (!existing || existing.length === 0) {
-      return res.status(404).json({ error: 'Expense not found' });
-    }
-
-    // Validate category if provided
-    if (category && category !== 'needs' && category !== 'wants') {
-      return res.status(400).json({ error: 'Category must be "needs" or "wants"' });
-    }
-
-    // Validate subcategory if provided
-    if (subcategory) {
-      const validSubcategories = [
-        'food', 'transportation', 'clothes', 'toys', 'gadgets',
-        'travel', 'utilities', 'rent', 'entertainment', 'other',
-      ];
-      if (!validSubcategories.includes(subcategory)) {
-        return res.status(400).json({ error: 'Invalid subcategory' });
-      }
-    }
-
-    const result = await sql`
-      UPDATE expenses 
-      SET 
-        name = ${name !== undefined ? name : existing[0].name},
-        amount = ${amount !== undefined ? Number(amount) : existing[0].amount},
-        category = ${category !== undefined ? category : existing[0].category},
-        subcategory = ${subcategory !== undefined ? subcategory : existing[0].subcategory},
-        is_recurring = ${is_recurring !== undefined ? Boolean(is_recurring) : existing[0].is_recurring},
-        recurring_interval = ${recurring_interval !== undefined ? recurring_interval : existing[0].recurring_interval},
-        next_due_date = ${next_due_date !== undefined ? next_due_date : existing[0].next_due_date},
-        updated_at = ${updatedAt}
-      WHERE id = ${req.params.id}
-      RETURNING *
-    `;
-
-    res.json(result[0]);
-  } catch (error: any) {
-    console.error('Error updating expense:', error);
-    res.status(500).json({ error: 'Failed to update expense', details: error.message });
+  if (!existing || existing.length === 0) {
+    throw new NotFoundError('Expense');
   }
-});
+
+  const result = await sql`
+    UPDATE expenses 
+    SET 
+      name = ${data.name !== undefined ? data.name : existing[0].name},
+      amount = ${data.amount !== undefined ? Number(data.amount) : existing[0].amount},
+      category = ${data.category !== undefined ? data.category : existing[0].category},
+      subcategory = ${data.subcategory !== undefined ? data.subcategory : existing[0].subcategory},
+      is_recurring = ${data.is_recurring !== undefined ? Boolean(data.is_recurring) : existing[0].is_recurring},
+      recurring_interval = ${data.recurring_interval !== undefined ? data.recurring_interval : existing[0].recurring_interval},
+      next_due_date = ${data.next_due_date !== undefined ? data.next_due_date : existing[0].next_due_date},
+      updated_at = ${updatedAt}
+    WHERE id = ${id} AND user_id = ${userId}
+    RETURNING *
+  `;
+
+  sendSuccess(res, result[0]);
+}));
 
 // DELETE /api/expenses/:id - Delete expense record
-router.delete('/:id', async (req: Request, res: Response) => {
-  try {
-    const result = await sql`
-      DELETE FROM expenses 
-      WHERE id = ${req.params.id}
-      RETURNING id
-    `;
+router.delete('/:id', asyncHandler(async (req: AuthRequest, res) => {
+  const id = validate(schemas.uuid, req.params.id);
+  const userId = req.userId!;
 
-    if (!result || result.length === 0) {
-      return res.status(404).json({ error: 'Expense not found' });
-    }
+  const result = await sql`
+    DELETE FROM expenses 
+    WHERE id = ${id} AND user_id = ${userId}
+    RETURNING id
+  `;
 
-    res.status(204).send();
-  } catch (error: any) {
-    console.error('Error deleting expense:', error);
-    res.status(500).json({ error: 'Failed to delete expense', details: error.message });
+  if (!result || result.length === 0) {
+    throw new NotFoundError('Expense');
   }
-});
+
+  res.status(204).send();
+}));
 
 export { router as expenseRoutes };
 

@@ -1,135 +1,120 @@
-import { Router, Request, Response } from 'express';
-import { Income } from '../types';
+import { Router } from 'express';
 import { sql } from '../lib/db';
+import { authenticate, AuthRequest } from '../middleware/auth';
+import { validate } from '../utils/validation';
+import { createIncomeSchema, updateIncomeSchema, getIncomeQuerySchema } from '../validators/income';
+import { asyncHandler, NotFoundError, UnauthorizedError } from '../utils/errors';
+import { sendSuccess } from '../utils/response';
+import { schemas } from '../utils/validation';
 
 const router = Router();
 
-// GET /api/income - Get all income records
-router.get('/', async (req: Request, res: Response) => {
-  try {
-    const { user_id } = req.query;
-    
-    let result;
-    if (user_id) {
-      result = await sql`
-        SELECT * FROM income 
-        WHERE user_id = ${user_id}
-        ORDER BY created_at DESC
-      `;
-    } else {
-      result = await sql`
-        SELECT * FROM income 
-        ORDER BY created_at DESC
-      `;
-    }
+// All income routes require authentication
+router.use(authenticate);
 
-    res.json(result || []);
-  } catch (error: any) {
-    console.error('Error fetching income:', error);
-    res.status(500).json({ error: 'Failed to fetch income records', details: error.message });
+// GET /api/income - Get all income records
+router.get('/', asyncHandler(async (req: AuthRequest, res) => {
+  const query = validate(getIncomeQuerySchema, req.query);
+  const userId = req.userId!;
+
+  // Users can only see their own income
+  const user_id = query.user_id || userId;
+  
+  if (user_id !== userId) {
+    throw new UnauthorizedError('You can only access your own income');
   }
-});
+
+  const result = await sql`
+    SELECT * FROM income 
+    WHERE user_id = ${user_id}
+    ORDER BY created_at DESC
+  `;
+
+  sendSuccess(res, result || []);
+}));
 
 // GET /api/income/:id - Get income by ID
-router.get('/:id', async (req: Request, res: Response) => {
-  try {
-    const result = await sql`
-      SELECT * FROM income 
-      WHERE id = ${req.params.id}
-    `;
+router.get('/:id', asyncHandler(async (req: AuthRequest, res) => {
+  const id = validate(schemas.uuid, req.params.id);
+  const userId = req.userId!;
 
-    if (!result || result.length === 0) {
-      return res.status(404).json({ error: 'Income not found' });
-    }
+  const result = await sql`
+    SELECT * FROM income 
+    WHERE id = ${id} AND user_id = ${userId}
+  `;
 
-    res.json(result[0]);
-  } catch (error: any) {
-    console.error('Error fetching income:', error);
-    res.status(500).json({ error: 'Failed to fetch income record', details: error.message });
+  if (!result || result.length === 0) {
+    throw new NotFoundError('Income');
   }
-});
+
+  sendSuccess(res, result[0]);
+}));
 
 // POST /api/income - Create a new income record
-router.post('/', async (req: Request, res: Response) => {
-  try {
-    const { user_id, name, amount, source, date_received } = req.body;
+router.post('/', asyncHandler(async (req: AuthRequest, res) => {
+  const userId = req.userId!;
+  const data = validate(createIncomeSchema, { ...req.body, user_id: userId });
 
-    if (!user_id || !name || amount === undefined || !source) {
-      return res.status(400).json({ 
-        error: 'Missing required fields: user_id, name, amount, source' 
-      });
-    }
+  const now = new Date().toISOString();
+  const dateReceived = data.date_received || now;
 
-    const now = new Date().toISOString();
-    const dateReceived = date_received || now;
+  const result = await sql`
+    INSERT INTO income (user_id, name, amount, source, date_received, created_at, updated_at)
+    VALUES (${data.user_id}, ${data.name}, ${Number(data.amount)}, ${data.source}, ${dateReceived}, ${now}, ${now})
+    RETURNING *
+  `;
 
-    const result = await sql`
-      INSERT INTO income (user_id, name, amount, source, date_received, created_at, updated_at)
-      VALUES (${user_id}, ${name}, ${Number(amount)}, ${source}, ${dateReceived}, ${now}, ${now})
-      RETURNING *
-    `;
-
-    res.status(201).json(result[0]);
-  } catch (error: any) {
-    console.error('Error creating income:', error);
-    res.status(500).json({ error: 'Failed to create income record', details: error.message });
-  }
-});
+  sendSuccess(res, result[0], 201);
+}));
 
 // PUT /api/income/:id - Update income record
-router.put('/:id', async (req: Request, res: Response) => {
-  try {
-    const { name, amount, source, date_received } = req.body;
-    const updatedAt = new Date().toISOString();
+router.put('/:id', asyncHandler(async (req: AuthRequest, res) => {
+  const id = validate(schemas.uuid, req.params.id);
+  const userId = req.userId!;
+  const data = validate(updateIncomeSchema, req.body);
+  const updatedAt = new Date().toISOString();
 
-    // First, get the existing record
-    const existing = await sql`
-      SELECT * FROM income WHERE id = ${req.params.id}
-    `;
+  // Get existing record and verify ownership
+  const existing = await sql`
+    SELECT * FROM income WHERE id = ${id} AND user_id = ${userId}
+  `;
 
-    if (!existing || existing.length === 0) {
-      return res.status(404).json({ error: 'Income not found' });
-    }
-
-    // Update with template literal (use existing values if not provided)
-    const result = await sql`
-      UPDATE income 
-      SET 
-        name = ${name !== undefined ? name : existing[0].name},
-        amount = ${amount !== undefined ? Number(amount) : existing[0].amount},
-        source = ${source !== undefined ? source : existing[0].source},
-        date_received = ${date_received !== undefined ? date_received : existing[0].date_received},
-        updated_at = ${updatedAt}
-      WHERE id = ${req.params.id}
-      RETURNING *
-    `;
-
-    res.json(result[0]);
-  } catch (error: any) {
-    console.error('Error updating income:', error);
-    res.status(500).json({ error: 'Failed to update income record', details: error.message });
+  if (!existing || existing.length === 0) {
+    throw new NotFoundError('Income');
   }
-});
+
+  const result = await sql`
+    UPDATE income 
+    SET 
+      name = ${data.name !== undefined ? data.name : existing[0].name},
+      amount = ${data.amount !== undefined ? Number(data.amount) : existing[0].amount},
+      source = ${data.source !== undefined ? data.source : existing[0].source},
+      date_received = ${data.date_received !== undefined ? data.date_received : existing[0].date_received},
+      updated_at = ${updatedAt}
+    WHERE id = ${id} AND user_id = ${userId}
+    RETURNING *
+  `;
+
+  sendSuccess(res, result[0]);
+}));
 
 // DELETE /api/income/:id - Delete income record
-router.delete('/:id', async (req: Request, res: Response) => {
-  try {
-    const result = await sql`
-      DELETE FROM income 
-      WHERE id = ${req.params.id}
-      RETURNING id
-    `;
+router.delete('/:id', asyncHandler(async (req: AuthRequest, res) => {
+  const id = validate(schemas.uuid, req.params.id);
+  const userId = req.userId!;
 
-    if (!result || result.length === 0) {
-      return res.status(404).json({ error: 'Income not found' });
-    }
+  const result = await sql`
+    DELETE FROM income 
+    WHERE id = ${id} AND user_id = ${userId}
+    RETURNING id
+  `;
 
-    res.status(204).send();
-  } catch (error: any) {
-    console.error('Error deleting income:', error);
-    res.status(500).json({ error: 'Failed to delete income record', details: error.message });
+  if (!result || result.length === 0) {
+    throw new NotFoundError('Income');
   }
-});
+
+  res.status(204).send();
+}));
 
 export { router as incomeRoutes };
 

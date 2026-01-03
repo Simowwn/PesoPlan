@@ -67,7 +67,7 @@ export function ExpenseForm({ onClose }: ExpenseFormProps) {
     setIsSubmitting(true);
     
     try {
-      addExpense({
+      await addExpense({
         name: name.trim(),
         amount: parsedAmount,
         category,

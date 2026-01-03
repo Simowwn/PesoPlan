@@ -1,122 +1,94 @@
-import { Router, Request, Response } from 'express';
-import { User } from '../types';
+import { Router } from 'express';
 import { sql } from '../lib/db';
+import { authenticate, AuthRequest } from '../middleware/auth';
+import { validate } from '../utils/validation';
+import { asyncHandler, NotFoundError, ConflictError, UnauthorizedError } from '../utils/errors';
+import { sendSuccess } from '../utils/response';
+import { schemas } from '../utils/validation';
+import { z } from 'zod';
 
 const router = Router();
 
-// GET /api/users - Get all users
-router.get('/', async (req: Request, res: Response) => {
-  try {
-    const result = await sql`
-      SELECT * FROM users 
-      ORDER BY created_at DESC
-    `;
-    res.json(result || []);
-  } catch (error: any) {
-    console.error('Error fetching users:', error);
-    res.status(500).json({ error: 'Failed to fetch users', details: error.message });
-  }
+const updateUserSchema = z.object({
+  email: schemas.email,
 });
 
-// GET /api/users/:id - Get user by ID
-router.get('/:id', async (req: Request, res: Response) => {
-  try {
-    const result = await sql`
-      SELECT * FROM users 
-      WHERE id = ${req.params.id}
-    `;
+// GET /api/users/:id - Get user by ID (public for verification, but limited info)
+router.get('/:id', asyncHandler(async (req, res) => {
+  const id = validate(schemas.uuid, req.params.id);
 
-    if (!result || result.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+  const result = await sql`
+    SELECT id, email, created_at FROM users 
+    WHERE id = ${id}
+  `;
 
-    res.json(result[0]);
-  } catch (error: any) {
-    console.error('Error fetching user:', error);
-    res.status(500).json({ error: 'Failed to fetch user', details: error.message });
+  if (!result || result.length === 0) {
+    throw new NotFoundError('User');
   }
-});
 
-// POST /api/users - Create a new user
-router.post('/', async (req: Request, res: Response) => {
-  try {
-    const { email } = req.body;
+  // Don't expose password_hash
+  sendSuccess(res, { id: result[0].id, email: result[0].email, created_at: result[0].created_at });
+}));
 
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required' });
-    }
+// PUT /api/users/:id - Update user (requires authentication and ownership)
+router.put('/:id', authenticate, asyncHandler(async (req: AuthRequest, res) => {
+  const id = validate(schemas.uuid, req.params.id);
+  const userId = req.userId!;
+  const data = validate(updateUserSchema, req.body);
 
-    const result = await sql`
-      INSERT INTO users (email, created_at)
-      VALUES (${email}, ${new Date().toISOString()})
-      RETURNING *
-    `;
-
-    res.status(201).json(result[0]);
-  } catch (error: any) {
-    console.error('Error creating user:', error);
-    // Handle unique constraint violation
-    if (error.code === '23505') {
-      return res.status(409).json({ error: 'Email already exists' });
-    }
-    res.status(500).json({ error: 'Failed to create user', details: error.message });
+  // Users can only update their own profile
+  if (id !== userId) {
+    throw new UnauthorizedError('You can only update your own profile');
   }
-});
 
-// PUT /api/users/:id - Update user
-router.put('/:id', async (req: Request, res: Response) => {
+  // Get existing user first
+  const existing = await sql`
+    SELECT * FROM users WHERE id = ${id}
+  `;
+
+  if (!existing || existing.length === 0) {
+    throw new NotFoundError('User');
+  }
+
   try {
-    const { email } = req.body;
-
-    // Get existing user first
-    const existing = await sql`
-      SELECT * FROM users WHERE id = ${req.params.id}
-    `;
-
-    if (!existing || existing.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required' });
-    }
-
     const result = await sql`
       UPDATE users 
-      SET email = ${email}
-      WHERE id = ${req.params.id}
-      RETURNING *
+      SET email = ${data.email}
+      WHERE id = ${id}
+      RETURNING id, email, created_at
     `;
 
-    res.json(result[0]);
+    sendSuccess(res, result[0]);
   } catch (error: any) {
-    console.error('Error updating user:', error);
     if (error.code === '23505') {
-      return res.status(409).json({ error: 'Email already exists' });
+      throw new ConflictError('Email already exists');
     }
-    res.status(500).json({ error: 'Failed to update user', details: error.message });
+    throw error;
   }
-});
+}));
 
-// DELETE /api/users/:id - Delete user
-router.delete('/:id', async (req: Request, res: Response) => {
-  try {
-    const result = await sql`
-      DELETE FROM users 
-      WHERE id = ${req.params.id}
-      RETURNING id
-    `;
+// DELETE /api/users/:id - Delete user (requires authentication and ownership)
+router.delete('/:id', authenticate, asyncHandler(async (req: AuthRequest, res) => {
+  const id = validate(schemas.uuid, req.params.id);
+  const userId = req.userId!;
 
-    if (!result || result.length === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    res.status(204).send();
-  } catch (error: any) {
-    console.error('Error deleting user:', error);
-    res.status(500).json({ error: 'Failed to delete user', details: error.message });
+  // Users can only delete their own account
+  if (id !== userId) {
+    throw new UnauthorizedError('You can only delete your own account');
   }
-});
+
+  const result = await sql`
+    DELETE FROM users 
+    WHERE id = ${id}
+    RETURNING id
+  `;
+
+  if (!result || result.length === 0) {
+    throw new NotFoundError('User');
+  }
+
+  res.status(204).send();
+}));
 
 export { router as userRoutes };
 

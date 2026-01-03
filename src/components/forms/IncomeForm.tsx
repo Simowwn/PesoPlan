@@ -39,7 +39,7 @@ export function IncomeForm({ onClose }: IncomeFormProps) {
     setIsSubmitting(true);
     
     try {
-      addIncome({
+      await addIncome({
         name: name.trim(),
         amount: parsedAmount,
         source,
