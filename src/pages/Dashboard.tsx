@@ -1,23 +1,23 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { useBudget } from '@/contexts/BudgetContext';
-import { AppLayout } from '@/components/layout/AppLayout';
-import { StatCard } from '@/components/dashboard/StatCard';
-import { BudgetProgress } from '@/components/dashboard/BudgetProgress';
-import { RecentTransactions } from '@/components/dashboard/RecentTransactions';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
-import { 
-  Wallet, 
-  TrendingUp, 
-  TrendingDown, 
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { useBudget } from "@/contexts/BudgetContext";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { StatCard } from "@/components/dashboard/StatCard";
+import { BudgetProgress } from "@/components/dashboard/BudgetProgress";
+import { RecentTransactions } from "@/components/dashboard/RecentTransactions";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
+import {
+  Wallet,
+  TrendingUp,
+  TrendingDown,
   PiggyBank,
   Plus,
   AlertCircle,
-  Loader2
-} from 'lucide-react';
+  Loader2,
+} from "lucide-react";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -26,7 +26,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      navigate('/auth');
+      navigate("/auth");
     }
   }, [user, authLoading, navigate]);
 
@@ -42,19 +42,19 @@ export default function Dashboard() {
 
   const budgetCategories = [
     {
-      name: 'Needs',
+      name: "Needs",
       budget: summary.needsBudget,
       spent: summary.needsSpent,
       percentage: activePlan?.needs_percentage || 50,
     },
     {
-      name: 'Wants',
+      name: "Wants",
       budget: summary.wantsBudget,
       spent: summary.wantsSpent,
       percentage: activePlan?.wants_percentage || 30,
     },
     {
-      name: 'Savings',
+      name: "Savings",
       budget: summary.savingsBudget,
       spent: 0,
       percentage: activePlan?.savings_percentage || 20,
@@ -62,8 +62,12 @@ export default function Dashboard() {
   ];
 
   const upcomingRecurring = expenses
-    .filter(e => e.is_recurring && e.next_due_date)
-    .sort((a, b) => new Date(a.next_due_date!).getTime() - new Date(b.next_due_date!).getTime())
+    .filter((e) => e.is_recurring && e.next_due_date)
+    .sort(
+      (a, b) =>
+        new Date(a.next_due_date!).getTime() -
+        new Date(b.next_due_date!).getTime()
+    )
     .slice(0, 5);
 
   return (
@@ -121,14 +125,26 @@ export default function Dashboard() {
           />
           <StatCard
             title="Needs Budget"
-            value={`₱${summary.needsRemaining.toLocaleString()}`}
-            subtitle={`of ₱${summary.needsBudget.toLocaleString()}`}
+            value={`₱${summary.needsRemaining.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}`}
+            subtitle={`of ₱${summary.needsBudget.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}`}
             icon={<TrendingDown className="h-5 w-5 text-red-500" />}
           />
           <StatCard
             title="Wants Budget"
-            value={`₱${summary.wantsRemaining.toLocaleString()}`}
-            subtitle={`of ₱${summary.wantsBudget.toLocaleString()}`}
+            value={`₱${summary.wantsRemaining.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}`}
+            subtitle={`of ₱${summary.wantsBudget.toLocaleString("en-US", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}`}
             icon={<TrendingUp className="h-5 w-5 text-red-400" />}
           />
           <StatCard
@@ -156,12 +172,14 @@ export default function Dashboard() {
         {upcomingRecurring.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base font-semibold">Upcoming Recurring Expenses</CardTitle>
+              <CardTitle className="text-base font-semibold">
+                Upcoming Recurring Expenses
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 {upcomingRecurring.map((expense) => (
-                  <div 
+                  <div
                     key={expense.id}
                     className="flex items-center justify-between p-3 rounded-lg bg-accent/50"
                   >
@@ -172,9 +190,16 @@ export default function Dashboard() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-semibold">₱{expense.amount.toLocaleString()}</p>
+                      <p className="text-sm font-semibold">
+                        ₱
+                        {expense.amount.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </p>
                       <p className="text-xs text-muted-foreground">
-                        Due {new Date(expense.next_due_date!).toLocaleDateString()}
+                        Due{" "}
+                        {new Date(expense.next_due_date!).toLocaleDateString()}
                       </p>
                     </div>
                   </div>

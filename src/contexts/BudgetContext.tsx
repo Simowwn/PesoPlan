@@ -237,21 +237,40 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
   const activePlan = plans.find((p) => p.active) || null;
 
   const summary: BudgetSummary = React.useMemo(() => {
-    const totalIncome = incomes.reduce((sum, i) => sum + i.amount, 0);
+    // Round all income amounts to avoid floating-point errors
+    const totalIncome =
+      Math.round(incomes.reduce((sum, i) => sum + i.amount, 0) * 100) / 100;
+
     const needsPercentage = activePlan?.needs_percentage || 50;
     const wantsPercentage = activePlan?.wants_percentage || 30;
     const savingsPercentage = activePlan?.savings_percentage || 20;
 
-    const needsBudget = (totalIncome * needsPercentage) / 100;
-    const wantsBudget = (totalIncome * wantsPercentage) / 100;
-    const savingsBudget = (totalIncome * savingsPercentage) / 100;
+    // Round budget calculations to 2 decimal places
+    const needsBudget =
+      Math.round(((totalIncome * needsPercentage) / 100) * 100) / 100;
+    const wantsBudget =
+      Math.round(((totalIncome * wantsPercentage) / 100) * 100) / 100;
+    const savingsBudget =
+      Math.round(((totalIncome * savingsPercentage) / 100) * 100) / 100;
 
-    const needsSpent = expenses
-      .filter((e) => e.category === "needs")
-      .reduce((sum, e) => sum + e.amount, 0);
-    const wantsSpent = expenses
-      .filter((e) => e.category === "wants")
-      .reduce((sum, e) => sum + e.amount, 0);
+    // Round spent amounts to 2 decimal places
+    const needsSpent =
+      Math.round(
+        expenses
+          .filter((e) => e.category === "needs")
+          .reduce((sum, e) => sum + e.amount, 0) * 100
+      ) / 100;
+
+    const wantsSpent =
+      Math.round(
+        expenses
+          .filter((e) => e.category === "wants")
+          .reduce((sum, e) => sum + e.amount, 0) * 100
+      ) / 100;
+
+    // Round remaining calculations to 2 decimal places
+    const needsRemaining = Math.round((needsBudget - needsSpent) * 100) / 100;
+    const wantsRemaining = Math.round((wantsBudget - wantsSpent) * 100) / 100;
 
     return {
       totalIncome,
@@ -260,8 +279,8 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
       savingsBudget,
       needsSpent,
       wantsSpent,
-      needsRemaining: needsBudget - needsSpent,
-      wantsRemaining: wantsBudget - wantsSpent,
+      needsRemaining,
+      wantsRemaining,
     };
   }, [incomes, expenses, activePlan]);
 
