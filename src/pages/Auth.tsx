@@ -1,61 +1,82 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
-import { Wallet, ArrowRight, Loader2 } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import { Wallet, ArrowRight, Loader2 } from "lucide-react";
 
 export default function Auth() {
   const navigate = useNavigate();
   const { user, login, signup, isLoading: authLoading } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
-      navigate('/dashboard');
+      navigate("/dashboard");
     }
   }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email || !password) {
-      toast.error('Please fill in all fields');
+      toast.error("Please fill in all fields");
       return;
     }
 
     if (!isLogin && password !== confirmPassword) {
-      toast.error('Passwords do not match');
+      toast.error("Passwords do not match");
       return;
     }
 
     if (password.length < 6) {
-      toast.error('Password must be at least 6 characters');
+      toast.error("Password must be at least 6 characters");
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const { error } = isLogin 
+      const { error } = isLogin
         ? await login(email, password)
         : await signup(email, password);
 
       if (error) {
-        toast.error(error);
+        // Check if it's an email confirmation message (not really an error)
+        if (error.includes("check your email to confirm")) {
+          toast.success("Account created! Please check your email.", {
+            description: "Click the confirmation link, then you can sign in.",
+            duration: 5000,
+          });
+          // Switch to login mode after signup
+          setIsLogin(true);
+          setEmail(email); // Keep the email filled in
+          setPassword("");
+          setConfirmPassword("");
+        } else {
+          toast.error(error);
+        }
       } else {
-        toast.success(isLogin ? 'Welcome back!' : 'Account created successfully!');
-        navigate('/dashboard');
+        toast.success(
+          isLogin ? "Welcome back!" : "Account created successfully!"
+        );
+        navigate("/dashboard");
       }
     } catch (err) {
-      toast.error('An unexpected error occurred');
+      toast.error("An unexpected error occurred");
     } finally {
       setIsLoading(false);
     }
@@ -89,12 +110,12 @@ export default function Auth() {
         <Card className="border-border/50 shadow-elevated">
           <CardHeader className="space-y-1 pb-4">
             <CardTitle className="text-xl">
-              {isLogin ? 'Welcome back' : 'Create an account'}
+              {isLogin ? "Welcome back" : "Create an account"}
             </CardTitle>
             <CardDescription>
-              {isLogin 
-                ? 'Enter your credentials to access your account' 
-                : 'Start your journey to financial freedom'}
+              {isLogin
+                ? "Enter your credentials to access your account"
+                : "Start your journey to financial freedom"}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -110,7 +131,7 @@ export default function Auth() {
                   autoComplete="email"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <Input
@@ -137,12 +158,17 @@ export default function Auth() {
                 </div>
               )}
 
-              <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
+              <Button
+                type="submit"
+                className="w-full"
+                size="lg"
+                disabled={isLoading}
+              >
                 {isLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <>
-                    {isLogin ? 'Sign In' : 'Create Account'}
+                    {isLogin ? "Sign In" : "Create Account"}
                     <ArrowRight className="h-4 w-4 ml-2" />
                   </>
                 )}
@@ -155,9 +181,9 @@ export default function Auth() {
                 onClick={() => setIsLogin(!isLogin)}
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
-                {isLogin 
-                  ? "Don't have an account? Sign up" 
-                  : 'Already have an account? Sign in'}
+                {isLogin
+                  ? "Don't have an account? Sign up"
+                  : "Already have an account? Sign in"}
               </button>
             </div>
           </CardContent>
