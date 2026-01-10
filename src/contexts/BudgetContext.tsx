@@ -85,6 +85,66 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
   const [plans, setPlans] = useState<BudgetPlan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Helper function to ensure user exists in public.users table
+  // This is a fallback in case the database trigger hasn't synced the user yet
+  const ensureUserExists = useCallback(
+    async (userId: string, email: string) => {
+      try {
+        // Check if user exists
+        // @ts-expect-error - Supabase types not generated yet
+        const { data: existingUser, error: checkError } = await supabase
+          .from("users")
+          .select("id")
+          .eq("id", userId)
+          .maybeSingle();
+
+        // If user doesn't exist, try to create it
+        // Note: This may fail if RLS policies prevent client-side inserts
+        // In that case, the database trigger should handle user creation
+        if (checkError || !existingUser) {
+          // @ts-expect-error - Supabase types not generated yet
+          const { error: insertError } = await supabase
+            .from("users")
+            .insert({
+              id: userId,
+              email: email,
+              created_at: new Date().toISOString(),
+            })
+            .select()
+            .maybeSingle();
+
+          if (insertError) {
+            // If it's a conflict error (23505), user was created between check and insert (race condition) - this is OK
+            // If it's a permission error (42501), RLS is blocking - trigger should handle it, but we'll log it
+            if (insertError.code === "23505") {
+              // User exists now, which is fine
+              return;
+            } else if (insertError.code === "42501") {
+              // RLS blocking - this means the trigger should handle user creation
+              // Log a warning but don't throw - the database trigger should sync the user
+              console.warn(
+                "⚠️ Cannot create user from client (RLS blocked). " +
+                  "Ensure the sync trigger is set up. Run SYNC_SUPABASE_AUTH_USERS.sql in Supabase SQL Editor."
+              );
+              // Don't throw - let the operation proceed and see if the user exists
+              // If the foreign key constraint fails, it will be caught by the calling function
+              return;
+            } else {
+              // Other error - log and throw
+              console.error("Error ensuring user exists:", insertError);
+              throw insertError;
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error ensuring user exists:", error);
+        // Don't throw - let the operation proceed
+        // If the user truly doesn't exist, the foreign key constraint will catch it
+      }
+    },
+    []
+  );
+
   const loadData = useCallback(async () => {
     if (!user) return;
 
@@ -211,6 +271,9 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     if (!user) return;
 
     try {
+      // Ensure user exists in public.users table
+      await ensureUserExists(user.id, user.email);
+
       // @ts-ignore - Supabase types not generated yet
       const { data, error } = await supabase
         .from("income")
@@ -284,6 +347,9 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     if (!user) return;
 
     try {
+      // Ensure user exists in public.users table
+      await ensureUserExists(user.id, user.email);
+
       // @ts-ignore - Supabase types not generated yet
       const { data, error } = await supabase
         .from("expenses")
@@ -367,6 +433,9 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     if (!user) return;
 
     try {
+      // Ensure user exists in public.users table
+      await ensureUserExists(user.id, user.email);
+
       // If this plan is active, deactivate others first
       if (plan.active !== false) {
         // @ts-ignore - Supabase types not generated yet
@@ -409,7 +478,18 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
               "Go to: Supabase Dashboard > Table Editor > budget_plans > RLS Policies\n" +
               "Or run the SQL commands provided in the console."
           );
+        } else if (error.code === "23503") {
+          // Foreign key constraint violation - user doesn't exist in users table
+          alert(
+            "User not found in database. Please sync your Supabase Auth users.\n\n" +
+              "1. Go to Supabase Dashboard > SQL Editor\n" +
+              "2. Run the SQL from: SYNC_SUPABASE_AUTH_USERS.sql\n" +
+              "3. This will create a trigger to automatically sync users.\n\n" +
+              "Or manually sync existing users by running the INSERT statement in that file."
+          );
+          throw error; // Re-throw so the UI can handle it
         }
+        throw error; // Re-throw so the UI can handle it
       } else if (data) {
         const newPlan = transformBudgetPlan(data);
         // If this plan is active, deactivate others in state

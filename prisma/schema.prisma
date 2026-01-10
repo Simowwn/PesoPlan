@@ -10,7 +10,7 @@ generator client {
 }
 
 model User {
-  id           String   @id @default(uuid())
+  id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
   password_hash String?
   created_at   DateTime @default(now())
@@ -23,8 +23,8 @@ model User {
 }
 
 model Income {
-  id            String   @id @default(uuid())
-  user_id       String
+  id            String   @id @default(uuid()) @db.Uuid
+  user_id       String   @db.Uuid
   name          String
   amount        Decimal  @db.Decimal(10, 2)
   source        String
@@ -38,8 +38,8 @@ model Income {
 }
 
 model Expense {
-  id                String    @id @default(uuid())
-  user_id           String
+  id                String    @id @default(uuid()) @db.Uuid
+  user_id           String    @db.Uuid
   name              String
   amount            Decimal   @db.Decimal(10, 2)
   category          String    // 'needs' | 'wants'
@@ -56,8 +56,8 @@ model Expense {
 }
 
 model BudgetPlan {
-  id                String   @id @default(uuid())
-  user_id           String
+  id                String   @id @default(uuid()) @db.Uuid
+  user_id           String   @db.Uuid
   needs_percentage  Decimal  @db.Decimal(5, 2)
   wants_percentage  Decimal  @db.Decimal(5, 2)
   savings_percentage Decimal @db.Decimal(5, 2)
