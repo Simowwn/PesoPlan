@@ -9,8 +9,8 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "api:dev": "tsx watch server/index.ts",
-    "api:start": "tsx server/index.ts"
+    "api:dev": "tsx watch api/index.ts",
+    "api:start": "tsx api/index.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
