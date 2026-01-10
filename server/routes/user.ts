@@ -1,5 +1,7 @@
 import { Router } from 'express';
-import { sql } from '../lib/db';
+import { db } from '../lib/db';
+import { userTable } from '../lib/schema';
+import { eq } from 'drizzle-orm';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { validate } from '../utils/validation';
 import { asyncHandler, NotFoundError, ConflictError, UnauthorizedError } from '../utils/errors';
@@ -17,17 +19,20 @@ const updateUserSchema = z.object({
 router.get('/:id', asyncHandler(async (req, res) => {
   const id = validate(schemas.uuid, req.params.id);
 
-  const result = await sql`
-    SELECT id, email, created_at FROM users 
-    WHERE id = ${id}
-  `;
+  const result = await db
+    .select({
+      id: userTable.id,
+      email: userTable.email,
+      createdAt: userTable.createdAt,
+    })
+    .from(userTable)
+    .where(eq(userTable.id, id));
 
   if (!result || result.length === 0) {
     throw new NotFoundError('User');
   }
 
-  // Don't expose password_hash
-  sendSuccess(res, { id: result[0].id, email: result[0].email, created_at: result[0].created_at });
+  sendSuccess(res, result[0]);
 }));
 
 // PUT /api/users/:id - Update user (requires authentication and ownership)
@@ -41,26 +46,26 @@ router.put('/:id', authenticate, asyncHandler(async (req: AuthRequest, res) => {
     throw new UnauthorizedError('You can only update your own profile');
   }
 
-  // Get existing user first
-  const existing = await sql`
-    SELECT * FROM users WHERE id = ${id}
-  `;
-
+  // Check if user exists
+  const existing = await db.select({ id: userTable.id }).from(userTable).where(eq(userTable.id, id));
   if (!existing || existing.length === 0) {
     throw new NotFoundError('User');
   }
 
   try {
-    const result = await sql`
-      UPDATE users 
-      SET email = ${data.email}
-      WHERE id = ${id}
-      RETURNING id, email, created_at
-    `;
+    const result = await db
+      .update(userTable)
+      .set({ email: data.email })
+      .where(eq(userTable.id, id))
+      .returning({
+        id: userTable.id,
+        email: userTable.email,
+        createdAt: userTable.createdAt,
+      });
 
     sendSuccess(res, result[0]);
   } catch (error: any) {
-    if (error.code === '23505') {
+    if (error.code === '23505') { // Handle unique constraint violation for email
       throw new ConflictError('Email already exists');
     }
     throw error;
@@ -77,11 +82,10 @@ router.delete('/:id', authenticate, asyncHandler(async (req: AuthRequest, res) =
     throw new UnauthorizedError('You can only delete your own account');
   }
 
-  const result = await sql`
-    DELETE FROM users 
-    WHERE id = ${id}
-    RETURNING id
-  `;
+  const result = await db
+    .delete(userTable)
+    .where(eq(userTable.id, id))
+    .returning({ id: userTable.id });
 
   if (!result || result.length === 0) {
     throw new NotFoundError('User');
@@ -91,5 +95,3 @@ router.delete('/:id', authenticate, asyncHandler(async (req: AuthRequest, res) =
 }));
 
 export { router as userRoutes };
-
-

@@ -15,3 +15,4 @@ export const getIncomeQuerySchema = z.object({
   user_id: schemas.uuid.optional(),
 });
 
+
