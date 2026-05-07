@@ -48,9 +48,7 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
 
       setIsLoading(true);
       try {
-        const token = localStorage.getItem('pesoplan_token');
         const headers = { 
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         };
 
@@ -103,11 +101,9 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
   const addIncome = async (income: Omit<Income, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
     if (!user) return;
     try {
-      const token = localStorage.getItem('pesoplan_token');
       const response = await fetch(`${API_URL}/api/income`, {
         method: 'POST',
         headers: { 
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json' 
         },
         body: JSON.stringify({ ...income, user_id: user.id }),
@@ -123,11 +119,9 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
 
   const updateIncome = async (id: string, updates: Partial<Income>) => {
     try {
-      const token = localStorage.getItem('pesoplan_token');
       const response = await fetch(`${API_URL}/api/income/${id}`, {
         method: 'PUT',
         headers: { 
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json' 
         },
         body: JSON.stringify(updates),
@@ -142,10 +136,9 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
 
   const deleteIncome = async (id: string) => {
     try {
-      const token = localStorage.getItem('pesoplan_token');
       const response = await fetch(`${API_URL}/api/income/${id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
+        headers: { },
       });
       if (response.ok) {
         setIncomes(prev => prev.filter(i => i.id !== id));
@@ -158,11 +151,9 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
   const addExpense = async (expense: Omit<Expense, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
     if (!user) return;
     try {
-      const token = localStorage.getItem('pesoplan_token');
       const response = await fetch(`${API_URL}/api/expenses`, {
         method: 'POST',
         headers: { 
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json' 
         },
         body: JSON.stringify({ ...expense, user_id: user.id }),
@@ -178,11 +169,9 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
 
   const updateExpense = async (id: string, updates: Partial<Expense>) => {
     try {
-      const token = localStorage.getItem('pesoplan_token');
       const response = await fetch(`${API_URL}/api/expenses/${id}`, {
         method: 'PUT',
         headers: { 
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json' 
         },
         body: JSON.stringify(updates),
@@ -197,10 +186,9 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
 
   const deleteExpense = async (id: string) => {
     try {
-      const token = localStorage.getItem('pesoplan_token');
       const response = await fetch(`${API_URL}/api/expenses/${id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
+        headers: { },
       });
       if (response.ok) {
         setExpenses(prev => prev.filter(e => e.id !== id));
@@ -213,11 +201,9 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
   const addPlan = async (plan: Omit<BudgetPlan, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
     if (!user) return;
     try {
-      const token = localStorage.getItem('pesoplan_token');
       const response = await fetch(`${API_URL}/api/budget-plans`, {
         method: 'POST',
         headers: { 
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json' 
         },
         body: JSON.stringify({ ...plan, user_id: user.id }),
@@ -236,10 +222,9 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
 
   const setActivePlan = async (id: string) => {
     try {
-      const token = localStorage.getItem('pesoplan_token');
       const response = await fetch(`${API_URL}/api/budget-plans/${id}/activate`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
+        headers: { },
       });
       if (response.ok) {
         setPlans(prev => prev.map(p => ({
@@ -254,10 +239,9 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
 
   const deletePlan = async (id: string) => {
     try {
-      const token = localStorage.getItem('pesoplan_token');
       const response = await fetch(`${API_URL}/api/budget-plans/${id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
+        headers: { },
       });
       if (response.ok) {
         setPlans(prev => prev.filter(p => p.id !== id));
