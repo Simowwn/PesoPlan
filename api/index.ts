@@ -1,7 +1,3 @@
-// Load environment variables first
-import 'dotenv/config';
-// Load environment variables from .env file
-import 'dotenv/config';
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { incomeRoutes } from './routes/income';
@@ -43,8 +39,8 @@ app.use((err: Error, req: Request, res: Response, next: express.NextFunction) =>
 // Export the app for Vercel
 export default app;
 
-// Only listen if not running as a serverless function
-if (process.env.NODE_ENV !== 'production') {
+// Only listen if running locally
+if (process.env.NODE_ENV !== 'production' && process.env.VERCEL !== '1') {
   app.listen(PORT, () => {
     console.log(`🚀 API server running on http://localhost:${PORT}`);
     console.log(`📋 Health check: http://localhost:${PORT}/api/health`);
