@@ -2,34 +2,39 @@ import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from './schema';
 
-// Get connection string from environment variable
-const connectionString = process.env.DATABASE_URL || '';
+// Create a variable to hold the initialized client
+let sqlInstance: any = null;
 
-if (!connectionString) {
-  console.error('❌ ERROR: DATABASE_URL is not set in environment variables.');
-}
+export function getSql() {
+  if (sqlInstance) return sqlInstance;
 
-// Create Neon HTTP client with a fallback to prevent immediate crash
-let sql: any;
-try {
-  if (connectionString) {
-    sql = neon(connectionString);
-  } else {
-    // Mock sql function to prevent crashes during initialization
-    sql = async () => { 
-      throw new Error('Database connection string is missing. Please set DATABASE_URL.'); 
-    };
+  const connectionString = process.env.DATABASE_URL || '';
+  if (!connectionString) {
+    console.error('❌ ERROR: DATABASE_URL is not set.');
+    return async () => { throw new Error('DATABASE_URL is missing'); };
   }
-} catch (err) {
-  console.error('❌ ERROR: Failed to initialize Neon client:', err);
-  sql = async () => { throw err; };
+
+  try {
+    sqlInstance = neon(connectionString);
+    return sqlInstance;
+  } catch (err) {
+    console.error('❌ ERROR: Failed to initialize Neon client:', err);
+    throw err;
+  }
 }
 
-// Create Drizzle ORM instance
-export const db = drizzle(sql, { schema });
+// Proxy the sql object so we don't have to change all the route files
+export const sql = new Proxy(() => {}, {
+  get(target, prop) {
+    return getSql()[prop];
+  },
+  apply(target, thisArg, argumentsList) {
+    return getSql()(...argumentsList);
+  }
+});
 
-// Export raw SQL client
-export { sql };
+// Create Drizzle ORM instance lazily
+export const db = drizzle(sql as any, { schema });
 
-export const getDb = () => sql;
+export const getDb = () => getSql();
 
