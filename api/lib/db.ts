@@ -6,19 +6,30 @@ import * as schema from './schema';
 const connectionString = process.env.DATABASE_URL || '';
 
 if (!connectionString) {
-  console.warn('⚠️  DATABASE_URL not set. Database operations will fail.');
+  console.error('❌ ERROR: DATABASE_URL is not set in environment variables.');
 }
 
-// Create Neon HTTP client (returns a tagged template function)
-const sql = neon(connectionString);
+// Create Neon HTTP client with a fallback to prevent immediate crash
+let sql: any;
+try {
+  if (connectionString) {
+    sql = neon(connectionString);
+  } else {
+    // Mock sql function to prevent crashes during initialization
+    sql = async () => { 
+      throw new Error('Database connection string is missing. Please set DATABASE_URL.'); 
+    };
+  }
+} catch (err) {
+  console.error('❌ ERROR: Failed to initialize Neon client:', err);
+  sql = async () => { throw err; };
+}
 
-// Create Drizzle ORM instance (optional, for type-safe queries)
+// Create Drizzle ORM instance
 export const db = drizzle(sql, { schema });
 
-// Export raw SQL client for direct queries
-// Usage: await sql`SELECT * FROM income WHERE id = ${id}`
+// Export raw SQL client
 export { sql };
 
-// Helper function to get a database connection
 export const getDb = () => sql;
 
