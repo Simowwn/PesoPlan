@@ -13,6 +13,11 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+// Root route for testing
+app.get('/api', (req: Request, res: Response) => {
+  res.json({ status: 'ok', message: 'PesoPlan API is running' });
+});
+
 // Health check endpoint
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', message: 'API is running' });
