@@ -1,8 +1,32 @@
 {
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api"
+      "source": "/api/debug-db",
+      "destination": "/api/debug-db.ts"
+    },
+    {
+      "source": "/api/test",
+      "destination": "/api/test.ts"
+    },
+    {
+      "source": "/api/auth/(.*)",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/api/users/(.*)",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/api/income/(.*)",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/api/expenses/(.*)",
+      "destination": "/api/index.ts"
+    },
+    {
+      "source": "/api/budget-plans/(.*)",
+      "destination": "/api/index.ts"
     }
   ]
 }
