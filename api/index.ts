@@ -1,10 +1,10 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
-import { incomeRoutes } from './routes/income';
-import { expenseRoutes } from './routes/expense';
-import { budgetPlanRoutes } from './routes/budgetPlan';
-import { userRoutes } from './routes/user';
-import { authRoutes } from './routes/auth';
+import { incomeRoutes } from './routes/income.js';
+import { expenseRoutes } from './routes/expense.js';
+import { budgetPlanRoutes } from './routes/budgetPlan.js';
+import { userRoutes } from './routes/user.js';
+import { authRoutes } from './routes/auth.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
