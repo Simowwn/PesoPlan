@@ -4,37 +4,46 @@ import * as schema from './schema';
 
 // Create a variable to hold the initialized client
 let sqlInstance: any = null;
+let dbInstance: any = null;
 
 export function getSql() {
   if (sqlInstance) return sqlInstance;
 
   const connectionString = process.env.DATABASE_URL || '';
   if (!connectionString) {
-    console.error('❌ ERROR: DATABASE_URL is not set.');
-    return async () => { throw new Error('DATABASE_URL is missing'); };
+    throw new Error('DATABASE_URL is missing. Please set it in Vercel settings.');
   }
 
   try {
     sqlInstance = neon(connectionString);
     return sqlInstance;
   } catch (err) {
-    console.error('❌ ERROR: Failed to initialize Neon client:', err);
+    console.error('❌ Failed to initialize Neon client:', err);
     throw err;
   }
 }
 
-// Proxy the sql object so we don't have to change all the route files
+export function getDb() {
+  if (dbInstance) return dbInstance;
+  dbInstance = drizzle(getSql(), { schema });
+  return dbInstance;
+}
+
+// Export raw SQL client as a function proxy
 export const sql = new Proxy(() => {}, {
   get(target, prop) {
-    return getSql()[prop];
+    const s = getSql();
+    return typeof s[prop] === 'function' ? s[prop].bind(s) : s[prop];
   },
   apply(target, thisArg, argumentsList) {
     return getSql()(...argumentsList);
   }
 });
 
-// Create Drizzle ORM instance lazily
-export const db = drizzle(sql as any, { schema });
-
-export const getDb = () => getSql();
+// Proxy for the db instance
+export const db = new Proxy({} as any, {
+  get(target, prop) {
+    return getDb()[prop];
+  }
+});
 
