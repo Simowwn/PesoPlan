@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/trace-routes",
+      "destination": "/api/trace-routes.ts"
+    },
+    {
       "source": "/api/test-express",
       "destination": "/api/test-express.ts"
     },
