@@ -32,63 +32,61 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [plans, setPlans] = useState<BudgetPlan[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Load data from localStorage
-  useEffect(() => {
-    if (user) {
-      const storedIncomes = JSON.parse(localStorage.getItem(STORAGE_KEYS.incomes) || '[]');
-      const storedExpenses = JSON.parse(localStorage.getItem(STORAGE_KEYS.expenses) || '[]');
-      const storedPlans = JSON.parse(localStorage.getItem(STORAGE_KEYS.plans) || '[]');
-      
-      setIncomes(storedIncomes.filter((i: Income) => i.user_id === user.id));
-      setExpenses(storedExpenses.filter((e: Expense) => e.user_id === user.id));
-      setPlans(storedPlans.filter((p: BudgetPlan) => p.user_id === user.id));
-    } else {
-      setIncomes([]);
-      setExpenses([]);
-      setPlans([]);
-    }
-  }, [user]);
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-  // Save data to localStorage
+  // Load data from API
   useEffect(() => {
-    if (user) {
-      const allIncomes = JSON.parse(localStorage.getItem(STORAGE_KEYS.incomes) || '[]');
-      const otherIncomes = allIncomes.filter((i: Income) => i.user_id !== user.id);
-      localStorage.setItem(STORAGE_KEYS.incomes, JSON.stringify([...otherIncomes, ...incomes]));
-    }
-  }, [incomes, user]);
+    const fetchData = async () => {
+      if (!user) {
+        setIncomes([]);
+        setExpenses([]);
+        setPlans([]);
+        return;
+      }
 
-  useEffect(() => {
-    if (user) {
-      const allExpenses = JSON.parse(localStorage.getItem(STORAGE_KEYS.expenses) || '[]');
-      const otherExpenses = allExpenses.filter((e: Expense) => e.user_id !== user.id);
-      localStorage.setItem(STORAGE_KEYS.expenses, JSON.stringify([...otherExpenses, ...expenses]));
-    }
-  }, [expenses, user]);
+      setIsLoading(true);
+      try {
+        const token = localStorage.getItem('pesoplan_token');
+        const headers = { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        };
 
-  useEffect(() => {
-    if (user) {
-      const allPlans = JSON.parse(localStorage.getItem(STORAGE_KEYS.plans) || '[]');
-      const otherPlans = allPlans.filter((p: BudgetPlan) => p.user_id !== user.id);
-      localStorage.setItem(STORAGE_KEYS.plans, JSON.stringify([...otherPlans, ...plans]));
-    }
-  }, [plans, user]);
+        const [incomesRes, expensesRes, plansRes] = await Promise.all([
+          fetch(`${API_URL}/api/income?user_id=${user.id}`, { headers }),
+          fetch(`${API_URL}/api/expenses?user_id=${user.id}`, { headers }),
+          fetch(`${API_URL}/api/budget-plans?user_id=${user.id}`, { headers })
+        ]);
+
+        if (incomesRes.ok) setIncomes(await incomesRes.json());
+        if (expensesRes.ok) setExpenses(await expensesRes.json());
+        if (plansRes.ok) setPlans(await plansRes.json());
+      } catch (error) {
+        console.error('Failed to fetch budget data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user, API_URL]);
 
   const activePlan = plans.find(p => p.active) || null;
 
   const summary: BudgetSummary = React.useMemo(() => {
-    const totalIncome = incomes.reduce((sum, i) => sum + i.amount, 0);
-    const needsPercentage = activePlan?.needs_percentage || 50;
-    const wantsPercentage = activePlan?.wants_percentage || 30;
-    const savingsPercentage = activePlan?.savings_percentage || 20;
+    const totalIncome = incomes.reduce((sum, i) => sum + Number(i.amount), 0);
+    const needsPercentage = Number(activePlan?.needs_percentage) || 50;
+    const wantsPercentage = Number(activePlan?.wants_percentage) || 30;
+    const savingsPercentage = Number(activePlan?.savings_percentage) || 20;
 
     const needsBudget = (totalIncome * needsPercentage) / 100;
     const wantsBudget = (totalIncome * wantsPercentage) / 100;
     const savingsBudget = (totalIncome * savingsPercentage) / 100;
 
-    const needsSpent = expenses.filter(e => e.category === 'needs').reduce((sum, e) => sum + e.amount, 0);
-    const wantsSpent = expenses.filter(e => e.category === 'wants').reduce((sum, e) => sum + e.amount, 0);
+    const needsSpent = expenses.filter(e => e.category === 'needs').reduce((sum, e) => sum + Number(e.amount), 0);
+    const wantsSpent = expenses.filter(e => e.category === 'wants').reduce((sum, e) => sum + Number(e.amount), 0);
 
     return {
       totalIncome,
@@ -102,78 +100,171 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     };
   }, [incomes, expenses, activePlan]);
 
-  const addIncome = (income: Omit<Income, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+  const addIncome = async (income: Omit<Income, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
     if (!user) return;
-    const newIncome: Income = {
-      ...income,
-      id: crypto.randomUUID(),
-      user_id: user.id,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    setIncomes(prev => [...prev, newIncome]);
-  };
-
-  const updateIncome = (id: string, updates: Partial<Income>) => {
-    setIncomes(prev => prev.map(i => 
-      i.id === id ? { ...i, ...updates, updated_at: new Date().toISOString() } : i
-    ));
-  };
-
-  const deleteIncome = (id: string) => {
-    setIncomes(prev => prev.filter(i => i.id !== id));
-  };
-
-  const addExpense = (expense: Omit<Expense, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
-    if (!user) return;
-    const newExpense: Expense = {
-      ...expense,
-      id: crypto.randomUUID(),
-      user_id: user.id,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    setExpenses(prev => [...prev, newExpense]);
-  };
-
-  const updateExpense = (id: string, updates: Partial<Expense>) => {
-    setExpenses(prev => prev.map(e => 
-      e.id === id ? { ...e, ...updates, updated_at: new Date().toISOString() } : e
-    ));
-  };
-
-  const deleteExpense = (id: string) => {
-    setExpenses(prev => prev.filter(e => e.id !== id));
-  };
-
-  const addPlan = (plan: Omit<BudgetPlan, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
-    if (!user) return;
-    const newPlan: BudgetPlan = {
-      ...plan,
-      id: crypto.randomUUID(),
-      user_id: user.id,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    
-    // If this plan is active, deactivate others
-    if (newPlan.active) {
-      setPlans(prev => prev.map(p => ({ ...p, active: false })));
+    try {
+      const token = localStorage.getItem('pesoplan_token');
+      const response = await fetch(`${API_URL}/api/income`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify({ ...income, user_id: user.id }),
+      });
+      if (response.ok) {
+        const newIncome = await response.json();
+        setIncomes(prev => [newIncome, ...prev]);
+      }
+    } catch (error) {
+      console.error('Failed to add income:', error);
     }
-    
-    setPlans(prev => [...prev, newPlan]);
   };
 
-  const setActivePlan = (id: string) => {
-    setPlans(prev => prev.map(p => ({
-      ...p,
-      active: p.id === id,
-      updated_at: new Date().toISOString(),
-    })));
+  const updateIncome = async (id: string, updates: Partial<Income>) => {
+    try {
+      const token = localStorage.getItem('pesoplan_token');
+      const response = await fetch(`${API_URL}/api/income/${id}`, {
+        method: 'PUT',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify(updates),
+      });
+      if (response.ok) {
+        setIncomes(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i));
+      }
+    } catch (error) {
+      console.error('Failed to update income:', error);
+    }
   };
 
-  const deletePlan = (id: string) => {
-    setPlans(prev => prev.filter(p => p.id !== id));
+  const deleteIncome = async (id: string) => {
+    try {
+      const token = localStorage.getItem('pesoplan_token');
+      const response = await fetch(`${API_URL}/api/income/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.ok) {
+        setIncomes(prev => prev.filter(i => i.id !== id));
+      }
+    } catch (error) {
+      console.error('Failed to delete income:', error);
+    }
+  };
+
+  const addExpense = async (expense: Omit<Expense, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+    if (!user) return;
+    try {
+      const token = localStorage.getItem('pesoplan_token');
+      const response = await fetch(`${API_URL}/api/expenses`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify({ ...expense, user_id: user.id }),
+      });
+      if (response.ok) {
+        const newExpense = await response.json();
+        setExpenses(prev => [newExpense, ...prev]);
+      }
+    } catch (error) {
+      console.error('Failed to add expense:', error);
+    }
+  };
+
+  const updateExpense = async (id: string, updates: Partial<Expense>) => {
+    try {
+      const token = localStorage.getItem('pesoplan_token');
+      const response = await fetch(`${API_URL}/api/expenses/${id}`, {
+        method: 'PUT',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify(updates),
+      });
+      if (response.ok) {
+        setExpenses(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
+      }
+    } catch (error) {
+      console.error('Failed to update expense:', error);
+    }
+  };
+
+  const deleteExpense = async (id: string) => {
+    try {
+      const token = localStorage.getItem('pesoplan_token');
+      const response = await fetch(`${API_URL}/api/expenses/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.ok) {
+        setExpenses(prev => prev.filter(e => e.id !== id));
+      }
+    } catch (error) {
+      console.error('Failed to delete expense:', error);
+    }
+  };
+
+  const addPlan = async (plan: Omit<BudgetPlan, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+    if (!user) return;
+    try {
+      const token = localStorage.getItem('pesoplan_token');
+      const response = await fetch(`${API_URL}/api/budget-plans`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify({ ...plan, user_id: user.id }),
+      });
+      if (response.ok) {
+        const newPlan = await response.json();
+        if (newPlan.active) {
+          setPlans(prev => prev.map(p => ({ ...p, active: false })));
+        }
+        setPlans(prev => [newPlan, ...prev]);
+      }
+    } catch (error) {
+      console.error('Failed to add plan:', error);
+    }
+  };
+
+  const setActivePlan = async (id: string) => {
+    try {
+      const token = localStorage.getItem('pesoplan_token');
+      const response = await fetch(`${API_URL}/api/budget-plans/${id}/activate`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.ok) {
+        setPlans(prev => prev.map(p => ({
+          ...p,
+          active: p.id === id
+        })));
+      }
+    } catch (error) {
+      console.error('Failed to activate plan:', error);
+    }
+  };
+
+  const deletePlan = async (id: string) => {
+    try {
+      const token = localStorage.getItem('pesoplan_token');
+      const response = await fetch(`${API_URL}/api/budget-plans/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (response.ok) {
+        setPlans(prev => prev.filter(p => p.id !== id));
+      }
+    } catch (error) {
+      console.error('Failed to delete plan:', error);
+    }
   };
 
   return (
