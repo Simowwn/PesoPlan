@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { Income } from '../types';
-import { sql } from '../lib/db';
+import { sql } from '../lib/db.js';
 
 const router = Router();
 
