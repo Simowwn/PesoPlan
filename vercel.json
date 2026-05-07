@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/test-express",
+      "destination": "/api/test-express.ts"
+    },
+    {
       "source": "/api/debug-db",
       "destination": "/api/debug-db.ts"
     },
