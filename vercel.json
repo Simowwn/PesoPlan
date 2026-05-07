@@ -27,6 +27,10 @@
     {
       "source": "/api/(.*)",
       "destination": "/api/index.ts"
+    },
+    {
+      "source": "/((?!api|favicon.ico|logo.svg|assets).*)",
+      "destination": "/index.html"
     }
   ]
 }
