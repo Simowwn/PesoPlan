@@ -40,9 +40,15 @@ app.use((err: Error, req: Request, res: Response, next: express.NextFunction) =>
   res.status(500).json({ error: 'Something went wrong!', message: err.message });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 API server running on http://localhost:${PORT}`);
-  console.log(`📋 Health check: http://localhost:${PORT}/api/health`);
-});
+// Export the app for Vercel
+export default app;
+
+// Only listen if not running as a serverless function
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`🚀 API server running on http://localhost:${PORT}`);
+    console.log(`📋 Health check: http://localhost:${PORT}/api/health`);
+  });
+}
 
 
